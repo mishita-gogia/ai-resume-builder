@@ -17,6 +17,6 @@ export default defineConfig({
   },
 
   preview: {
-    allowedHosts: ['voice-cv-ai-the-final-anthem.onrender.com'],
+    allowedHosts: ['voice-cv-ai-the-final-anthem.onrender.com,ai-resume-builder-9ltc.onrender.com'],
   },
 });
