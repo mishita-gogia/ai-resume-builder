@@ -1590,16 +1590,11 @@ if (generatedData.references) {
       </div>
 
       {/* ── STICKY PUSH-TO-TALK VOICE FOOTER (builder view only) ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-[80] border-t border-white/10 bg-slate-950/90 backdrop-blur-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.6)]">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center gap-3">
-          {/* Instruction */}
-          <div className="flex-1 text-center sm:text-left">
-            <p className="text-[11px] text-slate-400 font-medium leading-tight">
-              <span className="text-cyan-400 font-bold">Push &amp; Hold</span> the mic to speak your resume details in any Indian regional language.
-              Release when done — AI fills the fields automatically.
-            </p>
-          </div>
-          {/* Language selector inline */}
+      <div className="fixed bottom-0 left-0 right-0 z-[80] border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.5)]" style={{height:"56px"}}>
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between gap-4">
+          <p className="text-[11px] text-slate-500 hidden sm:block">
+            <span className="text-cyan-400 font-semibold">Push to Talk</span> — speak in any Indian language, AI fills your resume instantly.
+          </p>
           <VoiceInput
             onTranscriptReceived={handleVoiceTranscriptReceived}
             isLoading={isSTTLoading}
