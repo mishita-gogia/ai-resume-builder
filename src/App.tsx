@@ -1606,6 +1606,7 @@ if (generatedData.references) {
             setIsLoading={setIsSTTLoading}
             selectedLang={selectedLang}
             setSelectedLang={setSelectedLang}
+            footerMode={true}
           />
         </div>
       </div>
