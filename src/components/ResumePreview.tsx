@@ -506,11 +506,7 @@ export default function ResumePreview({
         )}
       </div>
 
-      <div className="text-[10px] text-slate-400 border-t border-slate-150 pt-3 mt-8 flex flex-row justify-between items-center bg-transparent">
-        <span>Formatted and structured by VoiceCV AI</span>
-        <span>ATS Verified</span>
-      </div>
-    </div>
+
   );
 
   // ── Professional Template ────────────────────────────────────────────────────
