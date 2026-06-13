@@ -17,7 +17,6 @@ import {
   Phone,
   Briefcase,
   MapPin,
-  CheckCircle,
   FileText,
   Bookmark,
   History,
@@ -40,6 +39,188 @@ import { ResumeData, ResumeTemplate, ATSAnalysisResult, SavedResume, initialResu
 import ResumePreview from "./components/ResumePreview";
 import VoiceInput from "./components/VoiceInput";
 import ATSAnalysis from "./components/ATSAnalysis";
+
+// ── ATS response normalizer ───────────────────────────────────────────────────
+// The /api/resume/ats engine returns { score, breakdown, suggestions, keywords }.
+// The UI (ATSAnalysis component) expects { score, strengths, missingKeywords,
+// suggestions, recruiterReadiness }. This maps the raw engine payload into the
+// shape the UI needs so the "Missing Recruiter Keywords" panel actually
+// populates instead of always showing an empty section.
+const normalizeATSResult = (raw: any): ATSAnalysisResult => {
+  const breakdown = raw?.breakdown || {};
+
+  const maxPoints: Record<string, number> = {
+    contactInfo: 10,
+    summary: 15,
+    experience: 25,
+    education: 15,
+    skills: 20,
+    formatting: 15,
+  };
+
+  const labels: Record<string, string> = {
+    contactInfo: "Contact details are complete and easy for recruiters to find",
+    summary: "Professional summary is strong and keyword-rich",
+    experience: "Work experience is well detailed with clear impact",
+    education: "Education section is properly structured",
+    skills: "Skills section aligns well with role expectations",
+    formatting: "Resume formatting is clean and ATS-friendly",
+  };
+
+  // Derive "strengths" from any breakdown category scoring 80%+ of its max
+  const strengths: string[] = Object.keys(breakdown)
+    .filter((key) => maxPoints[key] && breakdown[key] >= maxPoints[key] * 0.8)
+    .map((key) => labels[key] || key);
+
+  // Derive an overall "recruiter readiness" % from the parts recruiters skim
+  // first (summary, experience, skills). Falls back to overall score.
+  let recruiterReadiness = raw?.score ?? 0;
+  if (breakdown.summary !== undefined && breakdown.experience !== undefined && breakdown.skills !== undefined) {
+    const earned = breakdown.summary + breakdown.experience + breakdown.skills;
+    const max = maxPoints.summary + maxPoints.experience + maxPoints.skills;
+    recruiterReadiness = Math.round((earned / max) * 100);
+  }
+
+  return {
+    score: raw?.score ?? 0,
+    strengths,
+    missingKeywords: Array.isArray(raw?.keywords) ? raw.keywords : (raw?.missingKeywords || []),
+    suggestions: raw?.suggestions || [],
+    recruiterReadiness,
+  };
+};
+
+// ── Mini inline visualizations for the "Platform Features" deck ──────────────
+// Small, lightweight SVG/CSS visuals (no extra deps) that give each feature
+// card a concrete visual hook instead of a plain icon.
+const FeatureVisual = ({ type }: { type: string }) => {
+  switch (type) {
+    case "waveform":
+      return (
+        <div className="flex items-end gap-1 h-10" aria-hidden="true">
+          {[7, 16, 10, 22, 13, 19, 9, 15, 6].map((h, i) => (
+            <span
+              key={i}
+              className="w-1.5 rounded-full bg-gradient-to-t from-cyan-500 to-fuchsia-400 animate-pulse"
+              style={{ height: `${h}px`, animationDelay: `${i * 0.12}s`, animationDuration: "1.6s" }}
+            />
+          ))}
+        </div>
+      );
+    case "flow":
+      return (
+        <svg viewBox="0 0 120 40" className="w-full h-10" aria-hidden="true">
+          <line x1="10" y1="20" x2="110" y2="20" stroke="rgba(255,255,255,.10)" strokeWidth="2" />
+          <line x1="10" y1="20" x2="110" y2="20" stroke="url(#flowGrad)" strokeWidth="2" strokeDasharray="6 6" className="animate-pulse" />
+          {[10, 45, 80, 110].map((cx, i) => (
+            <circle key={i} cx={cx} cy="20" r={i === 2 ? 5 : 4} fill={i === 2 ? "#e879f9" : "#22d3ee"} opacity={0.9} />
+          ))}
+          <defs>
+            <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop stopColor="#22d3ee" />
+              <stop offset="1" stopColor="#e879f9" />
+            </linearGradient>
+          </defs>
+        </svg>
+      );
+    case "score":
+      return (
+        <div className="relative w-12 h-12" aria-hidden="true">
+          <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
+            <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="3.5" />
+            <circle
+              cx="18" cy="18" r="15" fill="none"
+              stroke="url(#scoreGrad)" strokeWidth="3.5"
+              strokeDasharray="94.2" strokeDashoffset="9" strokeLinecap="round"
+            />
+            <defs>
+              <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stopColor="#22d3ee" />
+                <stop offset="1" stopColor="#e879f9" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white font-display">90%</span>
+        </div>
+      );
+    case "stack":
+      return (
+        <div className="relative h-10 w-16" aria-hidden="true">
+          <div className="absolute inset-0 rounded-md border border-white/10 bg-white/[0.03] translate-x-3 translate-y-1 rotate-3" />
+          <div className="absolute inset-0 rounded-md border border-white/10 bg-white/[0.05] -translate-x-1 -rotate-2" />
+          <div className="absolute inset-0 rounded-md border border-cyan-400/30 bg-gradient-to-br from-cyan-500/15 to-fuchsia-500/15 flex flex-col gap-1 p-1.5">
+            <span className="h-1 w-2/3 rounded-full bg-cyan-300/60" />
+            <span className="h-1 w-full rounded-full bg-white/15" />
+            <span className="h-1 w-1/2 rounded-full bg-white/15" />
+          </div>
+        </div>
+      );
+    case "page":
+      return (
+        <div className="relative h-10 w-8 mx-auto" aria-hidden="true">
+          <div className="absolute inset-0 rounded-sm border border-cyan-400/30 bg-white/[0.04] flex flex-col gap-1 p-1.5">
+            <span className="h-1 w-2/3 rounded-full bg-cyan-300/60" />
+            <span className="h-0.5 w-full rounded-full bg-white/15" />
+            <span className="h-0.5 w-full rounded-full bg-white/15" />
+            <span className="h-0.5 w-3/4 rounded-full bg-white/15" />
+          </div>
+          <div className="absolute -bottom-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500/90 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,.5)]">
+            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+          </div>
+        </div>
+      );
+    case "bars":
+      return (
+        <div className="flex items-end gap-1.5 h-10" aria-hidden="true">
+          {[60, 85, 45, 100, 70].map((h, i) => (
+            <span
+              key={i}
+              className="w-2 rounded-t-sm bg-gradient-to-t from-indigo-500/40 to-cyan-400"
+              style={{ height: `${h * 0.34}px`, opacity: 0.5 + h / 200 }}
+            />
+          ))}
+        </div>
+      );
+    case "split":
+      return (
+        <div className="flex gap-1.5 h-10" aria-hidden="true">
+          <div className="flex-1 rounded-md border border-white/10 bg-white/[0.03] p-1.5 flex flex-col gap-1">
+            <span className="h-1 w-1/2 rounded-full bg-white/20" />
+            <span className="h-0.5 w-full rounded-full bg-white/10" />
+            <span className="h-0.5 w-full rounded-full bg-white/10" />
+          </div>
+          <div className="flex items-center text-cyan-400">
+            <ArrowRight className="w-3.5 h-3.5" />
+          </div>
+          <div className="flex-1 rounded-md border border-cyan-400/30 bg-gradient-to-br from-cyan-500/10 to-fuchsia-500/10 p-1.5 flex flex-col gap-1">
+            <span className="h-1 w-1/2 rounded-full bg-cyan-300/60" />
+            <span className="h-0.5 w-full rounded-full bg-white/15" />
+            <span className="h-0.5 w-full rounded-full bg-white/15" />
+          </div>
+        </div>
+      );
+    case "trend":
+      return (
+        <svg viewBox="0 0 100 40" className="w-full h-10" aria-hidden="true">
+          <polyline
+            points="2,32 18,26 34,30 50,16 66,20 82,6 98,10"
+            fill="none" stroke="url(#trendGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          />
+          {[2, 34, 66, 98].map((x, i) => (
+            <circle key={i} cx={x} cy={[32, 30, 20, 10][i]} r="2.5" fill="#e879f9" />
+          ))}
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop stopColor="#22d3ee" />
+              <stop offset="1" stopColor="#e879f9" />
+            </linearGradient>
+          </defs>
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
 
 export default function App() {
   // Navigation & Sessions state
@@ -74,6 +255,17 @@ export default function App() {
 
   // Active form section accordion tabs
   const [activeAccordion, setActiveAccordion] = useState<string>("personal");
+
+  // Tracks vertical scroll position so the navbar can surface a "Build Resume"
+  // call-to-action once the hero section has scrolled out of view (home page only)
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 220);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Multi-page template settings and downloading alerts
   const [isDownloading, setIsDownloading] = useState(false);
@@ -521,7 +713,8 @@ if (generatedData.references) {
         throw new Error("Failed to get response from ATS Engine");
       }
 
-      const result: ATSAnalysisResult = await res.json();
+      const raw = await res.json();
+      const result: ATSAnalysisResult = normalizeATSResult(raw);
       setAtsAnalysis(result);
 
       // Automatically translate ATS report if regional language is active
@@ -687,6 +880,23 @@ if (generatedData.references) {
 
           {/* Auth CTA Trigger Button */}
           <div className="flex items-center gap-3">
+            {/* Sticky "Build Resume" CTA — appears once the hero has scrolled out of view on Home */}
+            {currentView === "home" && isScrolled && (
+              <button
+                onClick={() => {
+                  if (currentUser) {
+                    setCurrentView("builder");
+                  } else {
+                    setAuthMode("register");
+                    setCurrentView("auth");
+                  }
+                }}
+                id="btn-nav-build-resume"
+                className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-cyan-400 to-fuchsia-500 hover:from-cyan-300 hover:to-fuchsia-400 text-white text-xs font-bold px-5 py-2.5 rounded-full glow-cyan shimmer-btn transition-all duration-200 active:scale-95 cursor-pointer animate-fade-in"
+              >
+                Build Resume <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
             {currentUser ? (
               <div className="flex items-center gap-3">
                 <div onClick={() => setCurrentView("history")} className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/10 cursor-pointer hover:bg-white/5 transition shadow-sm animate-fade-in">
@@ -751,7 +961,7 @@ if (generatedData.references) {
                 }
               }}
               id="btn-hero-build-resume"
-              className="w-full sm:w-auto bg-gradient-to-r from-cyan-400 to-fuchsia-500 hover:from-cyan-300 hover:to-fuchsia-400 text-white font-bold text-sm px-8 py-3.5 rounded-full glow-cyan transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-gradient-to-r from-cyan-400 to-fuchsia-500 hover:from-cyan-300 hover:to-fuchsia-400 text-white font-bold text-sm px-8 py-3.5 rounded-full glow-cyan shimmer-btn transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               Build Resume Now <ArrowRight className="w-4.5 h-4.5" />
             </button>
@@ -800,7 +1010,7 @@ if (generatedData.references) {
                 { step: "03", title: "AI Real-time Structuring", desc: "Sarvam & AI translate and format details into 20 mandatory fields." },
                 { step: "04", title: "Review & Save", desc: "Fine-tune with live ATS scoring suggestions, select your template, and download standard PDF." }
               ].map((item, idx) => (
-                <div key={idx} className="group bg-white/[0.04] backdrop-blur-2xl p-7 rounded-[30px] border border-white/10 shadow-2xl shadow-black/30 relative space-y-4 transition-all duration-500 hover:-translate-y-4 hover:scale-[1.03] hover:border-cyan-400/40 hover:shadow-[0_0_50px_rgba(34,211,238,0.15)]">
+                <div key={idx} className="group bg-white/[0.04] backdrop-blur-2xl p-7 rounded-[30px] border border-white/10 shadow-2xl shadow-black/30 relative space-y-4 transition-all duration-500 hover:-translate-y-4 hover:scale-[1.03] hover:border-cyan-400/40 hover:shadow-[0_0_50px_rgba(34,211,238,0.15)] tech-border">
                   <span className="text-3xl font-black gradient-text font-display block">{item.step}</span>
                   <h3 className="font-bold text-white text-sm">{item.title}</h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-light">{item.desc}</p>
@@ -819,21 +1029,26 @@ if (generatedData.references) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { title: "Multilingual Voice Input", desc: "Supports Hindi, Telugu, Marathi, Bengali, Urdu, and more. Describe values comfortably in your native tongue." },
-              { title: "AI Resume Generation", desc: "AI parses transcripts instantly into verified professional executive summary headers." },
-              { title: "ATS Score Analysis", desc: "Detailed breakdown of formatting mistakes, missing buzzwords, and actual compatibility scores." },
-              { title: "Professional Templates", desc: "Select Modern, Centered Professional, or Minimalist standard templates tailored for recruitment." },
-              { title: "PDF Export", desc: "Direct multi-page PDF rendering via jsPDF. Accurate typography layouts ready for submissions." },
-              { title: "Accessibility First", desc: "Clear layouts, dynamic verbal speech audio feedback translation loop, and responsive grids." },
-              { title: "Real-Time Preview", desc: "Every edit in details updates the active templates instantly. Know exactly how it looks before saving." },
-              { title: "AI Content Enhancement", desc: "Automatically translates conversational speech transcripts into standard recruiter action items." }
+              { title: "Multilingual Voice Input", desc: "Supports Hindi, Telugu, Marathi, Bengali, Urdu, and more. Describe values comfortably in your native tongue.", icon: Mic, visual: "waveform" },
+              { title: "AI Resume Generation", desc: "AI parses transcripts instantly into verified professional executive summary headers.", icon: Sparkles, visual: "flow" },
+              { title: "ATS Score Analysis", desc: "Detailed breakdown of formatting strengths, missing keywords, and live compatibility scores.", icon: Search, visual: "score" },
+              { title: "Professional Templates", desc: "Select Modern, Centered Professional, or Minimalist standard templates tailored for recruitment.", icon: LayoutTemplate, visual: "stack" },
+              { title: "Single-Page PDF Export", desc: "Crisp, recruiter-ready single-page PDF export via jsPDF — perfectly scaled typography every time.", icon: Download, visual: "page" },
+              { title: "Accessibility First", desc: "Clear layouts, dynamic verbal speech audio feedback translation loop, and responsive grids.", icon: Globe, visual: "bars" },
+              { title: "Real-Time Preview", desc: "Every edit in details updates the active templates instantly. Know exactly how it looks before saving.", icon: Cpu, visual: "split" },
+              { title: "AI Content Enhancement", desc: "Automatically translates conversational speech transcripts into standard recruiter action items.", icon: Terminal, visual: "trend" }
             ].map((feat, idx) => (
-              <div key={idx} className="group p-7 rounded-[30px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl shadow-xl shadow-black/20 hover:border-cyan-400/40 hover:-translate-y-3 hover:scale-[1.02] hover:shadow-[0_0_50px_rgba(34,211,238,0.12)] transition-all duration-500 space-y-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/15 to-fuchsia-500/15 flex items-center justify-center text-cyan-400">
-                  <CheckCircle className="w-5 h-5 text-cyan-400" />
+              <div key={idx} className="group p-7 rounded-[30px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl shadow-xl shadow-black/20 hover:border-cyan-400/40 hover:-translate-y-3 hover:scale-[1.02] hover:shadow-[0_0_50px_rgba(34,211,238,0.12)] transition-all duration-500 space-y-4 tech-border">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/15 to-fuchsia-500/15 flex items-center justify-center text-cyan-400">
+                    <feat.icon className="w-5 h-5 text-cyan-400" />
+                  </div>
                 </div>
                 <h3 className="text-sm font-bold text-white">{feat.title}</h3>
                 <p className="text-xs text-slate-500 leading-relaxed font-light">{feat.desc}</p>
+                <div className="pt-2 border-t border-white/5">
+                  <FeatureVisual type={feat.visual} />
+                </div>
               </div>
             ))}
           </div>
@@ -856,7 +1071,7 @@ if (generatedData.references) {
                     setCurrentView("auth");
                   }
                 }}
-                className="bg-white text-violet-950 hover:bg-cyan-100 font-bold text-xs px-8 py-4 rounded-full shadow transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                className="bg-white text-violet-950 hover:bg-cyan-100 font-bold text-xs px-8 py-4 rounded-full shadow shimmer-btn transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
               >
                 Get Started Free
               </button>
@@ -1610,7 +1825,7 @@ if (generatedData.references) {
   };
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col justify-between font-sans text-slate-200 relative overflow-x-hidden antialiased">
+    <div className="min-h-screen bg-transparent flex flex-col justify-between font-sans text-slate-200 relative overflow-x-hidden antialiased grain-overlay">
       
       {/* Decors & Ambient Blurs */}
       <div className="absolute top-[-5%] right-[-5%] w-[600px] h-[600px] bg-cyan-500/[0.06] rounded-full blur-3xl opacity-70 z-0 pointer-events-none"></div>
