@@ -12,6 +12,7 @@ interface VoiceInputProps {
   setIsLoading: (val: boolean) => void;
   selectedLang: string;
   setSelectedLang: (val: string) => void;
+  footerMode?: boolean;
 }
 
 const INDIAN_LANGUAGES = [
@@ -34,6 +35,7 @@ export default function VoiceInput({
   setIsLoading,
   selectedLang,
   setSelectedLang,
+  footerMode = false,
 }: VoiceInputProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
@@ -344,6 +346,54 @@ const speakFeedbackAloud = async (textToSpeak: string) => {
   };
 
   return (
+  /* ── FOOTER COMPACT MODE ── */
+  footerMode ? (
+    <div className="flex items-center gap-2 shrink-0">
+      {/* Language picker */}
+      <Globe className="w-3 h-3 text-cyan-400 shrink-0" />
+      <select
+        value={selectedLang}
+        onChange={(e) => setSelectedLang(e.target.value)}
+        disabled={isRecording || isLoading}
+        className="bg-white/[0.06] border border-white/10 text-slate-200 text-[11px] rounded-md px-2 py-1 focus:outline-none cursor-pointer max-w-[120px]"
+      >
+        {INDIAN_LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code}>{lang.name}</option>
+        ))}
+      </select>
+
+      {/* PTT button */}
+      {!isRecording ? (
+        <button
+          onClick={startRecordingHandler}
+          disabled={isLoading}
+          id="btn-voice-mic-trigger"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-[0_0_12px_rgba(6,182,212,0.30)] transition-all active:scale-95 cursor-pointer"
+        >
+          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mic className="w-3 h-3" />}
+          {isLoading ? "Processing..." : "Push to Talk"}
+        </button>
+      ) : (
+        <button
+          onClick={stopRecordingHandler}
+          id="btn-voice-stop-trigger"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg animate-pulse cursor-pointer"
+        >
+          <Square className="w-3 h-3 fill-current" />
+          Stop · {formatTime(recordDuration)}
+        </button>
+      )}
+
+      {errorText && <span className="text-[10px] text-red-400 max-w-[120px] truncate">{errorText}</span>}
+      {!errorText && regionalTranscript && (
+        <span className="text-[10px] text-emerald-400 flex items-center gap-1 shrink-0">
+          <Check className="w-3 h-3" /> Done
+        </span>
+      )}
+    </div>
+  ) :
+  /* ── FULL MODE ── */
+  (
   <div
   id="voice-input-panel"
   className="relative overflow-hidden bg-white/[0.04] backdrop-blur-3xl p-8 rounded-[32px] border border-white/10 shadow-[0_0_60px_rgba(34,211,238,0.08)] flex flex-col gap-8"
@@ -505,5 +555,5 @@ const speakFeedbackAloud = async (textToSpeak: string) => {
         </div>
       )}
     </div>
-  );
+  ));
 }
