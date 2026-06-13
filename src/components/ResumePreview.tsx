@@ -215,25 +215,28 @@ export default function ResumePreview({
         s.innerHTML = originalCssTexts[i];
       });
 
-      // ── Generate PDF ───────────────────────────────────────────────────────
+      // ── Generate PDF (always a single A4 page) ─────────────────────────────
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 210;
+      const pageWidth = 210;
       const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      // Start from full-bleed width, then scale the whole image down (if
+      // needed) so the entire resume always fits on one A4 page.
+      let renderWidth = pageWidth;
+      let renderHeight = (canvas.height * renderWidth) / canvas.width;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      if (renderHeight > pageHeight) {
+        const shrink = pageHeight / renderHeight;
+        renderHeight = pageHeight;
+        renderWidth = renderWidth * shrink;
       }
+
+      // Center horizontally (and vertically if there's leftover space)
+      const xOffset = (pageWidth - renderWidth) / 2;
+      const yOffset = renderHeight < pageHeight ? (pageHeight - renderHeight) / 2 : 0;
+
+      pdf.addImage(imgData, "PNG", xOffset, yOffset, renderWidth, renderHeight);
 
       const safeName = (personalInfo.name || "Resume").replace(/\s+/g, "_");
       pdf.save(`${safeName}_VoiceCV.pdf`);
@@ -265,16 +268,22 @@ export default function ResumePreview({
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
+  // Renders a list of short text items (skills, languages, etc.) as clean,
+  // wrapping inline text separated by middle-dots. No background "boxes" —
+  // this avoids the placeholder/box misalignment issue seen in the exported PDF
+  // and reads more naturally to ATS parsers.
   const renderList = (items: string[]) => {
     if (!items || items.length === 0) return null;
-    return items.map((item, index) => (
-      <span
-        key={index}
-        className="inline-block px-2.5 py-1 text-xs font-normal text-slate-700 bg-slate-100 rounded-md mr-1.5 mb-1.5 break-all border border-slate-200"
-      >
-        {item}
-      </span>
-    ));
+    return (
+      <p className="text-xs text-slate-600 leading-relaxed break-words">
+        {items.map((item, index) => (
+          <React.Fragment key={index}>
+            {index > 0 && <span className="text-slate-300 mx-1.5">&middot;</span>}
+            <span className="whitespace-nowrap">{item}</span>
+          </React.Fragment>
+        ))}
+      </p>
+    );
   };
 
   // ── Modern Template ──────────────────────────────────────────────────────────
@@ -440,14 +449,14 @@ export default function ResumePreview({
                 <div className="space-y-3">
                   {skills.technical && skills.technical.length > 0 && (
                     <div>
-                      <span className="text-xs font-semibold text-slate-800 block mb-1.5">Technical & Tools</span>
-                      <div className="flex flex-wrap">{renderList(skills.technical)}</div>
+                      <span className="text-xs font-semibold text-slate-800 block mb-1">Technical & Tools</span>
+                      {renderList(skills.technical)}
                     </div>
                   )}
                   {skills.soft && skills.soft.length > 0 && (
                     <div>
-                      <span className="text-xs font-semibold text-slate-800 block mb-1.5">Professional & Soft</span>
-                      <div className="flex flex-wrap">{renderList(skills.soft)}</div>
+                      <span className="text-xs font-semibold text-slate-800 block mb-1">Professional & Soft</span>
+                      {renderList(skills.soft)}
                     </div>
                   )}
                 </div>
@@ -473,8 +482,8 @@ export default function ResumePreview({
 
             {languages.length > 0 && (
               <div>
-                <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase border-b-2 border-slate-200 pb-1 mb-2.5">Languages</h3>
-                <div className="flex flex-wrap gap-1.5">{renderList(languages)}</div>
+                <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase border-b-2 border-slate-200 pb-1 mb-2">Languages</h3>
+                {renderList(languages)}
               </div>
             )}
 
@@ -492,7 +501,7 @@ export default function ResumePreview({
             {extracurriculars.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase border-b-2 border-slate-200 pb-1 mb-2">Activities</h3>
-                <div className="flex flex-wrap gap-1.5">{renderList(extracurriculars)}</div>
+                {renderList(extracurriculars)}
               </div>
             )}
           </div>
@@ -504,10 +513,6 @@ export default function ResumePreview({
             <p className="text-xs text-slate-600 italic break-words whitespace-pre-line">{references}</p>
           </div>
         )}
-      </div>
-      <div className="text-[10px] text-slate-400 border-t border-slate-150 pt-3 mt-8 flex flex-row justify-between items-center bg-transparent">
-        <span>Formatted and structured by VoiceCV AI</span>
-        <span>ATS Verified</span>
       </div>
     </div>
   );
@@ -675,11 +680,6 @@ export default function ResumePreview({
           </div>
         )}
       </div>
-
-      <div className="text-[10px] text-slate-400 border-t border-slate-200 pt-3 mt-8 flex flex-row justify-between items-center bg-transparent font-sans">
-        <span>Fitted to National Recruitment Template Standards</span>
-        <span>100% compliant file</span>
-      </div>
     </div>
   );
 
@@ -790,11 +790,6 @@ export default function ResumePreview({
           )}
         </div>
       </div>
-
-      <div className="text-[10px] text-neutral-400 border-t border-neutral-100 pt-3 mt-8 flex flex-row justify-between items-center bg-transparent font-sans">
-        <span>Elegant minimal format</span>
-        <span>Clean ATS matching</span>
-      </div>
     </div>
   );
 
@@ -821,7 +816,7 @@ export default function ResumePreview({
         <button
           onClick={downloadPDFHandler}
           id="btn-download-pdf-preview"
-          className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 text-white font-bold text-xs px-4 py-2 rounded-lg glow-cyan transition-all duration-150 active:scale-95"
+          className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 text-white font-bold text-xs px-4 py-2 rounded-lg glow-cyan shimmer-btn transition-all duration-150 active:scale-95"
         >
           <Download className="w-3.5 h-3.5" />
           Download ATS-Friendly PDF
