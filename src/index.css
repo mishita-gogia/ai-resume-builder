@@ -347,3 +347,88 @@ button:active {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* =====================
+   SHIMMER CTA — adds a subtle moving light sweep across
+   primary call-to-action buttons for a "premium tech product" feel
+===================== */
+
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.shimmer-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255,255,255,.35) 50%,
+    transparent 65%
+  );
+  background-size: 220% 100%;
+  background-position: 200% 0;
+  transition: background-position .9s ease;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+.shimmer-btn:hover::after {
+  background-position: -20% 0;
+}
+
+/* =====================
+   TECH BORDER — animated gradient outline for highlighted panels
+===================== */
+
+.tech-border {
+  position: relative;
+  border-radius: inherit;
+}
+
+.tech-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(34,211,238,.45), rgba(99,102,241,.15), rgba(232,121,249,.45));
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity .35s ease;
+  animation: tech-border-flow 6s linear infinite;
+  pointer-events: none;
+}
+
+.tech-border:hover::before {
+  opacity: 1;
+}
+
+@keyframes tech-border-flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* =====================
+   SUBTLE GRAIN OVERLAY — adds depth/texture for a more premium surface
+===================== */
+
+.grain-overlay {
+  position: relative;
+}
+
+.grain-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
