@@ -39,8 +39,12 @@ VoiceCV AI is a modern, high-fidelity full-stack web application designed to hel
     └── lib/
         └── firebase.ts    # Firebase Authentication Google & Email proxy managers
 ```
-#Live Deployed Link
-[https://ai-resume-builder-9ltc.onrender.com/](https://ai-resume-builder-9ltc.onrender.com/)
+---  
+
+#Live Deployed Link  
+
+[https://ai-resume-builder-9ltc.onrender.com/](https://ai-resume-builder-9ltc.onrender.com/)  
+
 ---
 
 ## 🔑 Environment Variables & Secrets
