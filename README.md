@@ -47,6 +47,12 @@ VoiceCV AI is a modern, high-fidelity full-stack web application designed to hel
 
 ---
 
+# Live Demo Video  
+
+[Click here to watch the video](https://drive.google.com/file/d/1ASbjmw7TcJVq26qQmKTdn6TDehWphwpF/view?usp=sharing)  
+
+---
+
 ## 🔑 Environment Variables & Secrets
 
 The application reads all integrations dynamically. Create a `.env` in the root workspace directory matching the variable names below:
